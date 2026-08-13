@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>扫雷</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, #1f2430, #141821);
+    color: #e8eaf0;
+    padding: 14px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  h1 { font-size: 26px; letter-spacing: 8px; margin-bottom: 14px; }
+  .modes { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 10px; }
+  .modes button {
+    padding: 8px 18px;
+    border: 1px solid #3a4152;
+    border-radius: 8px;
+    background: #262c3b;
+    color: #e8eaf0;
+    cursor: pointer;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .modes button:hover { background: #303851; }
+  .modes button.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+
+  .custom-panel {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    justify-content: center;
+    background: #262c3b;
+    border: 1px solid #3a4152;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+  }
+  .custom-panel.hidden { display: none; }
+  .custom-panel label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: #9aa3b5;
+  }
+  .custom-panel input {
+    width: 90px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid #3a4152;
+    background: #1c2230;
+    color: #e8eaf0;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .custom-panel button {
+    padding: 8px 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #3b82f6;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .custom-panel button:hover { background: #2f6fd6; }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: #262c3b;
+    border: 1px solid #3a4152;
+    border-radius: 10px;
+    padding: 8px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  }
+  .counter {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 22px;
+    color: #ff6b6b;
+    background: #141821;
+    padding: 2px 10px;
+    border-radius: 6px;
+    min-width: 70px;
+    text-align: center;
+    letter-spacing: 2px;
+  }
+  .face {
+    font-size: 24px;
+    width: 46px;
+    height: 44px;
+    border-radius: 8px;
+    border: 1px solid #3a4152;
+    background: #1c2230;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .face:hover { background: #303851; }
+  .mode-toggle {
+    font-size: 13px;
+    padding: 0 12px;
+    height: 42px;
+    border-radius: 8px;
+    border: 1px solid #3a4152;
+    background: #1c2230;
+    color: #e8eaf0;
+    cursor: pointer;
+    line-height: 1;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .mode-toggle:hover { background: #303851; }
+  .mode-toggle.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+
+  #boardWrap {
+    width: 100%;
+    overflow: auto;
+    max-height: calc(100vh - 260px);
+    border-radius: 8px;
+  }
+  #board {
+    display: grid;
+    gap: 1px;
+    background: #3a4152;
+    padding: 3px;
+    border-radius: 6px;
+    width: max-content;
+    margin: 0 auto;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    touch-action: manipulation;
+  }
+  .cell {
+    width: var(--cell, 36px);
+    height: var(--cell, 36px);
+    background: radial-gradient(circle at center, #97a4bf 0%, #7d8aa5 72%, #687792 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--cell, 36px) * 0.62);
+    font-weight: 700;
+    font-family: Consolas, "Segoe UI", sans-serif;
+    cursor: pointer;
+    box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.32),
+                inset -2px -2px 0 rgba(0, 0, 0, 0.24);
+  }
+  .cell:hover {
+    background: radial-gradient(circle at center, #a6b2cb 0%, #93a1bd 72%, #7c8aa6 100%);
+  }
+  .cell.revealed {
+    background: radial-gradient(circle at center, #d9e1ee 0%, #c8d2e2 72%, #b4c1d6 100%);
+    cursor: default;
+    box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.14);
+  }
+  .cell.revealed:hover {
+    background: radial-gradient(circle at center, #d9e1ee 0%, #c8d2e2 72%, #b4c1d6 100%);
+  }
+  .cell.flagged {
+    background: radial-gradient(circle at center, #f4cf72 0%, #e8b74c 72%, #d5a03a 100%);
+  }
+  .cell.flagged::after { content: "🚩"; font-size: calc(var(--cell, 36px) * 0.7); }
+  .cell.mine {
+    background: radial-gradient(circle at center, #ec8080 0%, #e25c5c 72%, #c74b4b 100%);
+  }
+  .cell.exploded {
+    background: radial-gradient(circle at center, #ff7a7a 0%, #ff2b2b 72%, #d40000 100%);
+  }
+  .cell.wrong {
+    background: radial-gradient(circle at center, #f4cf72 0%, #e8b74c 72%, #d5a03a 100%);
+  }
+  .cell.n1 { color: #1e5fd6; }
+  .cell.n2 { color: #1d8a3c; }
+  .cell.n3 { color: #d1362f; }
+  .cell.n4 { color: #4a2fb3; }
+  .cell.n5 { color: #a33a1b; }
+  .cell.n6 { color: #147d7d; }
+  .cell.n7 { color: #222222; }
+  .cell.n8 { color: #555555; }
+  .cell.err { background: #ff5252 !important; }
+
+  .hint { margin-top: 12px; color: #7d8699; font-size: 13px; text-align: center; line-height: 1.8; }
+</style>
+</head>
+<body>
+  <h1>扫 雷</h1>
+
+  <div class="modes">
+    <button data-mode="easy" class="active">简单</button>
+    <button data-mode="medium">中等</button>
+    <button data-mode="hard">困难</button>
+    <button data-mode="custom">自定义</button>
+  </div>
+
+  <div id="customPanel" class="custom-panel hidden">
+    <label>行数（1-100）
+      <input id="cRows" type="number" min="1" max="100" value="16">
+    </label>
+    <label>列数（1-100）
+      <input id="cCols" type="number" min="1" max="100" value="30">
+    </label>
+    <label>雷数（1-999）
+      <input id="cMines" type="number" min="1" max="999" value="99">
+    </label>
+    <button id="cStart">开始游戏</button>
+  </div>
+
+  <div class="status">
+    <div class="counter" id="mineCount">010</div>
+    <button class="face" id="face" title="重新开始">🙂</button>
+    <button class="mode-toggle active" id="autoToggle" title="自动标雷已开启，点击切换为手动">自动标雷</button>
+    <div class="counter" id="timer">000</div>
+  </div>
+
+  <div id="boardWrap">
+    <div id="board"></div>
+  </div>
+
+  <div class="hint">左键翻开 · 右键插旗 · 数字格：雷标够则展开，标多则红闪报错 · 自动模式下剩格数等于数字时自动标雷<br>触屏长按插旗</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var MODES = {
+    easy:   { rows: 9,  cols: 9,  mines: 10 },
+    medium: { rows: 16, cols: 16, mines: 40 },
+    hard:   { rows: 16, cols: 30, mines: 99 }
+  };
+
+  var boardEl   = document.getElementById("board");
+  var mineEl    = document.getElementById("mineCount");
+  var timerEl   = document.getElementById("timer");
+  var faceEl    = document.getElementById("face");
+  var modeBtns  = document.querySelectorAll(".modes button");
+  var panelEl   = document.getElementById("customPanel");
+  var cRows     = document.getElementById("cRows");
+  var cCols     = document.getElementById("cCols");
+  var cMines    = document.getElementById("cMines");
+  var cStart    = document.getElementById("cStart");
+  var autoToggle = document.getElementById("autoToggle");
+
+  var rows = 9, cols = 9, mines = 10;
+  var grid = [], els = [];
+  var flags = 0, revealedCount = 0;
+  var started = false, over = false;
+  var seconds = 0, timerId = null;
+  var CELL_MAX = 36, CELL_MIN = 22;
+  var autoFlagOn = true;
+
+  function pad3(n) {
+    return String(Math.max(0, n)).padStart(3, "0");
+  }
+
+  function setCellSize() {
+    var availW = window.innerWidth - 50;
+    var availH = window.innerHeight - 310;
+    var cell = Math.floor(Math.min(availW / cols, availH / rows, CELL_MAX));
+    cell = Math.max(CELL_MIN, cell);
+    boardEl.style.setProperty("--cell", cell + "px");
+  }
+
+  function forEachNeighbor(r, c, fn) {
+    for (var di = -1; di <= 1; di++) {
+      for (var dj = -1; dj <= 1; dj++) {
+        if (di === 0 && dj === 0) continue;
+        var ni = r + di, nj = c + dj;
+        if (ni >= 0 && ni < rows && nj >= 0 && nj < cols) fn(ni, nj);
+      }
+    }
+  }
+
+  function initGame(r, c, m) {
+    rows = r; cols = c;
+    mines = Math.min(m, r * c - 1);
+    grid = []; els = [];
+    flags = 0; revealedCount = 0;
+    started = false; over = false;
+    seconds = 0; stopTimer();
+
+    mineEl.textContent = pad3(mines);
+    timerEl.textContent = "000";
+    faceEl.textContent = "🙂";
+
+    for (var i = 0; i < rows; i++) {
+      grid.push([]); els.push([]);
+      for (var j = 0; j < cols; j++) {
+        grid[i].push({ mine: false, revealed: false, flagged: false, n: 0 });
+      }
+    }
+    setCellSize();
+    renderBoard();
+  }
+
+  function renderBoard() {
+    boardEl.innerHTML = "";
+    boardEl.style.gridTemplateColumns = "repeat(" + cols + ", var(--cell))";
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < rows; i++) {
+      for (var j = 0; j < cols; j++) {
+        var d = document.createElement("div");
+        d.className = "cell";
+        d.dataset.r = i;
+        d.dataset.c = j;
+        frag.appendChild(d);
+        els[i][j] = d;
+      }
+    }
+    boardEl.appendChild(frag);
+  }
+
+  function placeMines(firstR, firstC) {
+    var candidates = [];
+    for (var i = 0; i < rows; i++) {
+      for (var j = 0; j < cols; j++) {
+        var near = Math.abs(i - firstR) <= 1 && Math.abs(j - firstC) <= 1;
+        if (!near) candidates.push([i, j]);
+      }
+    }
+    if (candidates.length < mines) {
+      candidates.length = 0;
+      for (var x = 0; x < rows; x++) {
+        for (var y = 0; y < cols; y++) {
+          if (!(x === firstR && y === firstC)) candidates.push([x, y]);
+        }
+      }
+    }
+    for (var k = 0; k < mines; k++) {
+      var idx = k + Math.floor(Math.random() * (candidates.length - k));
+      var tmp = candidates[k];
+      candidates[k] = candidates[idx];
+      candidates[idx] = tmp;
+      grid[candidates[k][0]][candidates[k][1]].mine = true;
+    }
+    for (var a = 0; a < rows; a++) {
+      for (var b = 0; b < cols; b++) {
+        if (grid[a][b].mine) continue;
+        var n = 0;
+        forEachNeighbor(a, b, function (ni, nj) {
+          if (grid[ni][nj].mine) n++;
+        });
+        grid[a][b].n = n;
+      }
+    }
+  }
+
+  function reveal(r, c) {
+    if (over) return;
+    var cell = grid[r][c];
+    if (cell.revealed || cell.flagged) return;
+
+    if (!started) {
+      started = true;
+      placeMines(r, c);
+      startTimer();
+    }
+
+    if (cell.mine) {
+      cell.revealed = true;
+      els[r][c].classList.add("revealed", "exploded");
+      els[r][c].textContent = "💣";
+      lose();
+      return;
+    }
+
+    cell.revealed = true;
+    revealedCount++;
+    var el = els[r][c];
+    el.classList.add("revealed");
+
+    if (cell.n === 0) {
+      forEachNeighbor(r, c, function (ni, nj) { reveal(ni, nj); });
+    } else {
+      el.textContent = cell.n;
+      el.classList.add("n" + cell.n);
+    }
+
+    if (revealedCount === rows * cols - mines) win();
+  }
+
+  // 数字格右键/左键：统计周围已插旗数，决定展开、自动标雷或报错
+  function processNumberCell(r, c) {
+    var cell = grid[r][c];
+    if (!cell.revealed || cell.n === 0) return false;
+    var hidden = [], flagged = 0;
+    forEachNeighbor(r, c, function (ni, nj) {
+      var nb = grid[ni][nj];
+      if (!nb.revealed) {
+        hidden.push([ni, nj]);
+        if (nb.flagged) flagged++;
+      }
+    });
+    if (flagged === cell.n) {
+      // 标够了：展开未插旗的邻格
+      hidden.forEach(function (pos) {
+        if (!grid[pos[0]][pos[1]].flagged) reveal(pos[0], pos[1]);
+      });
+      return;
+    }
+    if (autoFlagOn && hidden.length === cell.n) {
+      // 未开格恰好等于数字：这些格子全是雷，自动标雷
+      hidden.forEach(function (pos) {
+        if (!grid[pos[0]][pos[1]].flagged) toggleFlag(pos[0], pos[1]);
+      });
+      return;
+    }
+    if (flagged > cell.n) {
+      // 标多了：红闪报错
+      flagError(r, c);
+    }
+    // 标少了且无法确定：不展开
+  }
+
+  function flagError(r, c) {
+    var el = els[r][c];
+    el.classList.add("err");
+    setTimeout(function () {
+      el.classList.remove("err");
+    }, 600);
+  }
+
+  function toggleFlag(r, c) {
+    if (over) return;
+    var cell = grid[r][c];
+    if (cell.revealed) return;
+    var el = els[r][c];
+    if (cell.flagged) {
+      cell.flagged = false;
+      flags--;
+      el.classList.remove("flagged");
+      el.textContent = "";
+    } else {
+      cell.flagged = true;
+      flags++;
+      el.classList.add("flagged");
+    }
+    updateMineCount();
+  }
+
+  function updateMineCount() {
+    mineEl.textContent = pad3(mines - flags);
+  }
+
+  function startTimer() {
+    stopTimer();
+    timerId = setInterval(function () {
+      seconds++;
+      timerEl.textContent = pad3(Math.min(seconds, 999));
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerId) { clearInterval(timerId); timerId = null; }
+  }
+
+  function lose() {
+    over = true;
+    stopTimer();
+    faceEl.textContent = "😵";
+    for (var i = 0; i < rows; i++) {
+      for (var j = 0; j < cols; j++) {
+        var cell = grid[i][j], el = els[i][j];
+        if (cell.mine) {
+          if (!cell.flagged) {
+            el.classList.add("revealed", "mine");
+            el.textContent = "💣";
+          }
+        } else if (cell.flagged) {
+          el.classList.remove("flagged");
+          el.classList.add("revealed", "wrong");
+          el.textContent = "❌";
+        }
+      }
+    }
+  }
+
+  function win() {
+    over = true;
+    stopTimer();
+    faceEl.textContent = "😎";
+    for (var i = 0; i < rows; i++) {
+      for (var j = 0; j < cols; j++) {
+        var cell = grid[i][j];
+        if (cell.mine && !cell.flagged) {
+          cell.flagged = true;
+          flags++;
+          els[i][j].classList.add("flagged");
+        }
+      }
+    }
+    updateMineCount();
+  }
+
+  function clampInt(v, lo, hi, fallback) {
+    var n = parseInt(v, 10);
+    if (isNaN(n)) n = fallback;
+    return Math.max(lo, Math.min(hi, n));
+  }
+
+  function startCustom() {
+    var r = clampInt(cRows.value, 1, 100, 16);
+    var c = clampInt(cCols.value, 1, 100, 30);
+    var m = clampInt(cMines.value, 1, 999, 99);
+    m = Math.min(m, r * c - 1);
+    cRows.value = r;
+    cCols.value = c;
+    cMines.value = m;
+    initGame(r, c, m);
+  }
+
+  modeBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      modeBtns.forEach(function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      if (btn.dataset.mode === "custom") {
+        panelEl.classList.remove("hidden");
+        return;
+      }
+      panelEl.classList.add("hidden");
+      var cfg = MODES[btn.dataset.mode];
+      initGame(cfg.rows, cfg.cols, cfg.mines);
+    });
+  });
+
+  cStart.addEventListener("click", startCustom);
+  [cRows, cCols, cMines].forEach(function (input) {
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") startCustom();
+    });
+  });
+
+  faceEl.addEventListener("click", function () {
+    var active = document.querySelector(".modes button.active");
+    if (active && active.dataset.mode === "custom") {
+      startCustom();
+    } else {
+      var cfg = MODES[active ? active.dataset.mode : "easy"];
+      initGame(cfg.rows, cfg.cols, cfg.mines);
+    }
+  });
+
+  autoToggle.addEventListener("click", function () {
+    autoFlagOn = !autoFlagOn;
+    autoToggle.classList.toggle("active", autoFlagOn);
+    autoToggle.textContent = autoFlagOn ? "自动标雷" : "手动标雷";
+    autoToggle.title = autoFlagOn ? "自动标雷已开启，点击切换为手动" : "手动标雷已开启，点击切换为自动";
+  });
+
+  boardEl.addEventListener("click", function (e) {
+    var cellEl = e.target.closest(".cell");
+    if (!cellEl) return;
+    var r = +cellEl.dataset.r, c = +cellEl.dataset.c;
+    if (over || grid[r][c].flagged) return;
+    if (grid[r][c].revealed) { processNumberCell(r, c); return; }
+    reveal(r, c);
+  });
+
+  boardEl.addEventListener("contextmenu", function (e) {
+    e.preventDefault();
+    var cellEl = e.target.closest(".cell");
+    if (!cellEl) return;
+    var r = +cellEl.dataset.r, c = +cellEl.dataset.c;
+    var cell = grid[r][c];
+    if (over) return;
+    if (cell.revealed) {
+      processNumberCell(r, c);
+    } else {
+      toggleFlag(r, c);
+    }
+  });
+
+  document.addEventListener("visibilitychange", function () {
+    if (!started || over) return;
+    if (document.hidden) {
+      stopTimer();
+    } else {
+      startTimer();
+    }
+  });
+
+  window.addEventListener("resize", function () {
+    if (grid.length) setCellSize();
+  });
+
+  initGame(9, 9, 10);
+})();
+</script>
+</body>
+</html>
