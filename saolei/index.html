@@ -220,6 +220,7 @@
     <div class="counter" id="mineCount">010</div>
     <button class="face" id="face" title="重新开始">🙂</button>
     <button class="mode-toggle active" id="autoToggle" title="自动标雷已开启，点击切换为手动">自动标雷</button>
+    <button class="mode-toggle" id="guessToggle" title="普通模式，点击切换为无猜（新开局生效）">普通</button>
     <div class="counter" id="timer">000</div>
   </div>
 
@@ -227,7 +228,7 @@
     <div id="board"></div>
   </div>
 
-  <div class="hint">左键翻开 · 右键插旗 · 数字格：雷标够则展开，标多则红闪报错 · 自动模式下剩格数等于数字时自动标雷<br>触屏长按插旗</div>
+  <div class="hint">左键翻开 · 右键插旗 · 数字格：雷标够则展开，标多则红闪报错 · 自动模式下剩格数等于数字时自动标雷<br>触屏长按插旗 · 可切换无猜模式（新开局生效）</div>
 
 <script>
 (function () {
@@ -250,6 +251,7 @@
   var cMines    = document.getElementById("cMines");
   var cStart    = document.getElementById("cStart");
   var autoToggle = document.getElementById("autoToggle");
+  var guessToggle = document.getElementById("guessToggle");
 
   var rows = 9, cols = 9, mines = 10;
   var grid = [], els = [];
@@ -258,6 +260,7 @@
   var seconds = 0, timerId = null;
   var CELL_MAX = 36, CELL_MIN = 22;
   var autoFlagOn = true;
+  var noGuessOn = false;
 
   function pad3(n) {
     return String(Math.max(0, n)).padStart(3, "0");
@@ -320,6 +323,126 @@
     boardEl.appendChild(frag);
   }
 
+  // 从候选格中不重复地随机选出 count 个格子
+  function pickMines(candidates, count) {
+    var arr = candidates.slice();
+    for (var k = 0; k < count; k++) {
+      var idx = k + Math.floor(Math.random() * (arr.length - k));
+      var tmp = arr[k];
+      arr[k] = arr[idx];
+      arr[idx] = tmp;
+    }
+    return arr.slice(0, count);
+  }
+
+  // 模拟从 (r,c) 开始的展开（非递归洪泛）
+  function floodRevealSim(minesGrid, nGrid, revealed, r, c) {
+    var stack = [[r, c]];
+    while (stack.length) {
+      var pos = stack.pop();
+      var i = pos[0], j = pos[1];
+      if (i < 0 || i >= rows || j < 0 || j >= cols) continue;
+      if (revealed[i][j] || minesGrid[i][j]) continue;
+      revealed[i][j] = true;
+      if (nGrid[i][j] === 0) {
+        for (var di = -1; di <= 1; di++) {
+          for (var dj = -1; dj <= 1; dj++) {
+            if (di === 0 && dj === 0) continue;
+            stack.push([i + di, j + dj]);
+          }
+        }
+      }
+    }
+  }
+
+  // 判断该布局能否仅靠逻辑推理通关（无猜）
+  function solveNoGuess(minesGrid, nGrid, firstR, firstC) {
+    var revealed = [], flagged = [];
+    for (var i = 0; i < rows; i++) {
+      revealed.push([]); flagged.push([]);
+      for (var j = 0; j < cols; j++) { revealed[i].push(false); flagged[i].push(false); }
+    }
+    var totalSafe = 0;
+    for (var a = 0; a < rows; a++) {
+      for (var b = 0; b < cols; b++) {
+        if (!minesGrid[a][b]) totalSafe++;
+      }
+    }
+    floodRevealSim(minesGrid, nGrid, revealed, firstR, firstC);
+    var guard = Math.min(rows * cols, 500) + 5;
+    while (guard-- > 0) {
+      var progress = false;
+      for (var x = 0; x < rows; x++) {
+        for (var y = 0; y < cols; y++) {
+          if (!revealed[x][y] || nGrid[x][y] === 0) continue;
+          var n = nGrid[x][y];
+          var hidden = [], flaggedCount = 0;
+          for (var di = -1; di <= 1; di++) {
+            for (var dj = -1; dj <= 1; dj++) {
+              if (di === 0 && dj === 0) continue;
+              var ni = x + di, nj = y + dj;
+              if (ni < 0 || ni >= rows || nj < 0 || nj >= cols) continue;
+              if (!revealed[ni][nj]) {
+                hidden.push([ni, nj]);
+                if (flagged[ni][nj]) flaggedCount++;
+              }
+            }
+          }
+          if (hidden.length === n) {
+            // 未开格数等于数字：这些格子全是雷
+            for (var h1 = 0; h1 < hidden.length; h1++) {
+              if (!flagged[hidden[h1][0]][hidden[h1][1]]) {
+                flagged[hidden[h1][0]][hidden[h1][1]] = true;
+                progress = true;
+              }
+            }
+          }
+          if (flaggedCount === n) {
+            // 雷标够了：其余未开格全是安全的，翻开
+            for (var h2 = 0; h2 < hidden.length; h2++) {
+              if (!flagged[hidden[h2][0]][hidden[h2][1]]) {
+                floodRevealSim(minesGrid, nGrid, revealed, hidden[h2][0], hidden[h2][1]);
+                progress = true;
+              }
+            }
+          }
+        }
+      }
+      var revealedSafe = 0;
+      for (var m = 0; m < rows; m++) {
+        for (var q = 0; q < cols; q++) {
+          if (revealed[m][q]) revealedSafe++;
+        }
+      }
+      if (revealedSafe === totalSafe) return true;
+      if (!progress) return false;
+    }
+    return false;
+  }
+
+  // 检查一组雷位在首击 (firstR, firstC) 下是否无猜可解
+  function isLayoutNoGuess(picks, firstR, firstC) {
+    var minesGrid = [], nGrid = [];
+    for (var i = 0; i < rows; i++) {
+      minesGrid.push([]); nGrid.push([]);
+      for (var j = 0; j < cols; j++) minesGrid[i].push(false);
+    }
+    for (var p = 0; p < picks.length; p++) {
+      minesGrid[picks[p][0]][picks[p][1]] = true;
+    }
+    for (var a = 0; a < rows; a++) {
+      for (var b = 0; b < cols; b++) {
+        if (minesGrid[a][b]) { nGrid[a].push(0); continue; }
+        var n = 0;
+        forEachNeighbor(a, b, function (ni, nj) {
+          if (minesGrid[ni][nj]) n++;
+        });
+        nGrid[a].push(n);
+      }
+    }
+    return solveNoGuess(minesGrid, nGrid, firstR, firstC);
+  }
+
   function placeMines(firstR, firstC) {
     var candidates = [];
     for (var i = 0; i < rows; i++) {
@@ -336,12 +459,18 @@
         }
       }
     }
-    for (var k = 0; k < mines; k++) {
-      var idx = k + Math.floor(Math.random() * (candidates.length - k));
-      var tmp = candidates[k];
-      candidates[k] = candidates[idx];
-      candidates[idx] = tmp;
-      grid[candidates[k][0]][candidates[k][1]].mine = true;
+    var maxAttempts = noGuessOn ? (rows * cols <= 2500 ? 100 : 10) : 1;
+    var picks = null;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      var candidatePicks = pickMines(candidates, mines);
+      if (!noGuessOn || isLayoutNoGuess(candidatePicks, firstR, firstC)) {
+        picks = candidatePicks;
+        break;
+      }
+    }
+    if (!picks) picks = pickMines(candidates, mines);
+    for (var k = 0; k < picks.length; k++) {
+      grid[picks[k][0]][picks[k][1]].mine = true;
     }
     for (var a = 0; a < rows; a++) {
       for (var b = 0; b < cols; b++) {
@@ -555,6 +684,13 @@
     autoToggle.classList.toggle("active", autoFlagOn);
     autoToggle.textContent = autoFlagOn ? "自动标雷" : "手动标雷";
     autoToggle.title = autoFlagOn ? "自动标雷已开启，点击切换为手动" : "手动标雷已开启，点击切换为自动";
+  });
+
+  guessToggle.addEventListener("click", function () {
+    noGuessOn = !noGuessOn;
+    guessToggle.classList.toggle("active", noGuessOn);
+    guessToggle.textContent = noGuessOn ? "无猜" : "普通";
+    guessToggle.title = noGuessOn ? "无猜模式已开启，点击切换为普通（新开局生效）" : "普通模式，点击切换为无猜（新开局生效）";
   });
 
   boardEl.addEventListener("click", function (e) {
