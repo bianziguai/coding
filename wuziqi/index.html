@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>五子棋 · 人机对战</title>
+<title>空调通讯协议</title>
 <style>
 :root {
-  --text: #eae6de;
-  --muted: #9b958a;
-  --panel: #262a31;
-  --panel-border: #3a3f48;
-  --accent: #d9a05b;
+  --text: #e6e8ea;
+  --muted: #8f949a;
+  --panel: #24272b;
+  --panel-border: #35393e;
+  --accent: #4b5158;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
@@ -72,9 +72,9 @@ h1 {
 .difficulty button:hover { color: var(--text); }
 .difficulty button.active {
   background: var(--accent);
-  color: #2a2013;
+  color: #e8ebee;
   font-weight: 600;
-  box-shadow: 0 3px 10px rgba(217, 160, 91, .35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
 }
 .scoreboard {
   display: flex;
@@ -110,7 +110,7 @@ canvas {
 }
 .actions button {
   border: 1px solid var(--panel-border);
-  background: #31363f;
+  background: #2f343a;
   color: var(--text);
   padding: 9px 28px;
   border-radius: 10px;
@@ -119,14 +119,14 @@ canvas {
   font-family: inherit;
   transition: all .18s;
 }
-.actions button:hover { background: #3b414c; border-color: #4a515e; }
+.actions button:hover { background: #3a4048; border-color: #474d55; }
 .actions button.primary {
   background: var(--accent);
-  color: #2a2013;
-  border-color: var(--accent);
+  color: #e8ebee;
+  border-color: #5a6067;
   font-weight: 600;
 }
-.actions button.primary:hover { filter: brightness(1.08); }
+.actions button.primary:hover { background: #555b63; border-color: #666d75; }
 .hint {
   color: var(--muted);
   font-size: 12px;
@@ -136,9 +136,7 @@ canvas {
 </head>
 <body>
 <div class="app">
-  <h1>五子棋</h1>
-  <div class="sub">人机对战 · 三档难度</div>
-  <div class="panel">
+    <div class="panel">
     <div class="difficulty" id="difficulty">
       <button data-diff="easy" class="active">简单</button>
       <button data-diff="medium">中等</button>
@@ -533,13 +531,13 @@ function drawStone(px, py, color) {
   ctx.shadowOffsetY = 2;
   const g = ctx.createRadialGradient(px - r * 0.35, py - r * 0.35, r * 0.15, px, py, r);
   if (color === BLACK) {
-    g.addColorStop(0, '#5a5a5a');
-    g.addColorStop(0.5, '#2b2b2b');
-    g.addColorStop(1, '#0a0a0a');
+    g.addColorStop(0, '#6a6f74');
+    g.addColorStop(0.5, '#303438');
+    g.addColorStop(1, '#0e1013');
   } else {
-    g.addColorStop(0, '#ffffff');
-    g.addColorStop(0.7, '#ececec');
-    g.addColorStop(1, '#b9b9b9');
+    g.addColorStop(0, '#8b8381');
+    g.addColorStop(0.55, '#797070');
+    g.addColorStop(1, '#686162');
   }
   ctx.fillStyle = g;
   ctx.beginPath();
@@ -548,18 +546,24 @@ function drawStone(px, py, color) {
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
+  // 深灰棋盘上给黑子补一圈极淡的亮边，避免和底色糊在一起
+  if (color === BLACK) {
+    ctx.strokeStyle = 'rgba(226,231,236,.18)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
 }
 
 function draw() {
   // 棋盘底色
   const bg = ctx.createLinearGradient(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-  bg.addColorStop(0, '#e3b26d');
-  bg.addColorStop(1, '#c99046');
+  bg.addColorStop(0, '#45494f');
+  bg.addColorStop(1, '#3a3e44');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
   // 网格
-  ctx.strokeStyle = '#6b4a24';
+  ctx.strokeStyle = '#5c6168';
   ctx.lineWidth = 1;
   ctx.beginPath();
   for (let i = 0; i < BOARD_SIZE; i++) {
@@ -572,13 +576,13 @@ function draw() {
   ctx.stroke();
 
   // 边框
-  ctx.strokeStyle = '#5c3d1a';
+  ctx.strokeStyle = '#565b62';
   ctx.lineWidth = 2;
   ctx.strokeRect(PAD - 8, PAD - 8, CANVAS_SIZE - PAD * 2 + 16, CANVAS_SIZE - PAD * 2 + 16);
 
   // 星位
   const stars = [[3, 3], [3, 11], [11, 3], [11, 11], [7, 7]];
-  ctx.fillStyle = '#5c3d1a';
+  ctx.fillStyle = '#5c6168';
   for (let i = 0; i < stars.length; i++) {
     const sx = stars[i][0];
     const sy = stars[i][1];
